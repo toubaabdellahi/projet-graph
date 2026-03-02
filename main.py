@@ -33,9 +33,12 @@ def run_demo(g: Graph, start: str, target: str) -> None:
     print("3) Plus court chemin (Dijkstra)")
     print("====================")
     path, cost = shortest_path(g, start, target)
-    if path:
+    if path and cost != float("inf"):
         print(f"Chemin optimal {start} -> {target} :", " -> ".join(path))
         print("Coût total :", cost)
+    elif not is_connected(g):
+        print(f"⚠️ Aucun chemin trouvé : le graphe n'est pas connexe.")
+        print(f"   '{target}' n'est pas accessible depuis '{start}'.")
     else:
         print(f"Aucun chemin trouvé entre {start} et {target}.")
 

@@ -196,6 +196,16 @@ from graph import Graph, Edge
 # BFS / DFS
 # =========================
 def bfs_order(g: Graph, start: str) -> List[str]:
+    """
+    Parcours en largeur (BFS) depuis un sommet de départ.
+
+    Args:
+        g: Le graphe à parcourir.
+        start: Sommet de départ.
+
+    Returns:
+        Liste des sommets visités dans l'ordre BFS.
+    """
     if start not in g.adj:
         return []
     visited: Set[str] = {start}
@@ -213,6 +223,16 @@ def bfs_order(g: Graph, start: str) -> List[str]:
 
 
 def dfs_order(g: Graph, start: str) -> List[str]:
+    """
+    Parcours en profondeur (DFS) depuis un sommet de départ.
+
+    Args:
+        g: Le graphe à parcourir.
+        start: Sommet de départ.
+
+    Returns:
+        Liste des sommets visités dans l'ordre DFS.
+    """
     if start not in g.adj:
         return []
     visited: Set[str] = set()
@@ -230,6 +250,12 @@ def dfs_order(g: Graph, start: str) -> List[str]:
 
 
 def is_connected(g: Graph) -> bool:
+    """
+    Vérifie si le graphe est connexe (tous les sommets sont atteignables).
+
+    Returns:
+        True si le graphe est connexe, False sinon.
+    """
     nodes = g.nodes()
     if not nodes:
         return True
@@ -237,13 +263,37 @@ def is_connected(g: Graph) -> bool:
 
 
 def reachable_from(g: Graph, start: str) -> Set[str]:
+    """
+    Retourne l'ensemble des sommets atteignables depuis un sommet donné.
+
+    Args:
+        g: Le graphe.
+        start: Sommet de départ.
+
+    Returns:
+        Ensemble des sommets accessibles depuis start.
+    """
     return set(bfs_order(g, start))
 
 
 # =========================
 # DIJKSTRA
 # =========================
-def dijkstra(g: Graph, source: str):
+def dijkstra(g: Graph, source: str) -> Tuple[Dict[str, float], Dict[str, Optional[str]]]:
+    """
+    Algorithme de Dijkstra : calcule les distances minimales depuis une source.
+
+    Fonctionne sur des graphes à poids positifs.
+    Utilise une file de priorité (tas min) pour une complexité O((V + E) log V).
+
+    Args:
+        g: Le graphe pondéré.
+        source: Sommet de départ.
+
+    Returns:
+        dist: Dictionnaire {sommet: distance minimale depuis source}.
+        prev: Dictionnaire {sommet: prédécesseur sur le chemin optimal}.
+    """
     dist: Dict[str, float] = {v: float("inf") for v in g.nodes()}
     prev: Dict[str, Optional[str]] = {v: None for v in g.nodes()}
 
@@ -267,7 +317,18 @@ def dijkstra(g: Graph, source: str):
     return dist, prev
 
 
-def reconstruct_path(prev, start, end):
+def reconstruct_path(prev: Dict[str, Optional[str]], start: str, end: str) -> List[str]:
+    """
+    Reconstruit le chemin optimal à partir du dictionnaire des prédécesseurs.
+
+    Args:
+        prev: Dictionnaire des prédécesseurs (produit par dijkstra).
+        start: Sommet de départ.
+        end: Sommet d'arrivée.
+
+    Returns:
+        Liste des sommets formant le chemin de start à end. Liste vide si aucun chemin.
+    """
     path = []
     cur = end
     while cur is not None:
@@ -279,15 +340,47 @@ def reconstruct_path(prev, start, end):
     return path if path and path[0] == start else []
 
 
-def shortest_path(g: Graph, start: str, end: str):
+def shortest_path(g: Graph, start: str, end: str) -> Tuple[List[str], float]:
+    """
+    Calcule le chemin le plus court entre deux sommets via Dijkstra.
+
+    Args:
+        g: Le graphe pondéré.
+        start: Sommet de départ.
+        end: Sommet d'arrivée.
+
+    Returns:
+        Tuple (chemin, coût). Le chemin est une liste de sommets.
+        Retourne ([], inf) si aucun chemin n'existe.
+    """
     dist, prev = dijkstra(g, start)
-    return reconstruct_path(prev, start, end), dist[end]
+    # FIX: utiliser .get() pour éviter un KeyError si end n'est pas dans dist
+    cost = dist.get(end, float("inf"))
+    path = reconstruct_path(prev, start, end)
+    return path, cost
 
 
 # =========================
 # MST - PRIM
 # =========================
-def mst_prim(g: Graph, start: Optional[str] = None):
+def mst_prim(g: Graph, start: Optional[str] = None) -> Tuple[List[Edge], float]:
+    """
+    Algorithme de Prim : construit un arbre couvrant minimal (MST).
+
+    Principe : part d'un sommet et étend l'arbre en ajoutant à chaque étape
+    l'arête de poids minimal reliant un sommet visité à un sommet non visité.
+    Complexité : O(E log V) avec un tas min.
+
+    Args:
+        g: Le graphe non orienté pondéré.
+        start: Sommet de départ (optionnel, premier sommet par défaut).
+
+    Returns:
+        Tuple (liste des arêtes du MST, coût total).
+
+    Raises:
+        ValueError: Si le graphe est orienté.
+    """
     if g.directed:
         raise ValueError("Prim nécessite un graphe non orienté")
 
@@ -324,23 +417,67 @@ def mst_prim(g: Graph, start: Optional[str] = None):
 # MST - KRUSKAL
 # =========================
 class DSU:
-    def __init__(self, nodes):
-        self.parent = {n: n for n in nodes}
+    """
+    Structure Union-Find (Disjoint Set Union) avec compression de chemin et union par rang.
 
-    def find(self, x):
+    Utilisée par Kruskal pour détecter les cycles efficacement.
+    Complexité quasi-linéaire grâce aux deux optimisations.
+    """
+
+    def __init__(self, nodes: List[str]):
+        """
+        Args:
+            nodes: Liste de tous les sommets du graphe.
+        """
+        self.parent = {n: n for n in nodes}
+        self.rank = {n: 0 for n in nodes}  # union par rang pour équilibrer l'arbre
+
+    def find(self, x: str) -> str:
+        """Trouve la racine de x avec compression de chemin."""
         if self.parent[x] != x:
-            self.parent[x] = self.find(self.parent[x])
+            self.parent[x] = self.find(self.parent[x])  # compression de chemin
         return self.parent[x]
 
-    def union(self, a, b):
+    def union(self, a: str, b: str) -> bool:
+        """
+        Fusionne les ensembles de a et b. Utilise l'union par rang.
+
+        Returns:
+            True si a et b étaient dans des ensembles différents (arête utile),
+            False s'ils étaient déjà connectés (formerait un cycle).
+        """
         ra, rb = self.find(a), self.find(b)
         if ra == rb:
             return False
+        # Union par rang : on attache l'arbre de rang inférieur sous celui de rang supérieur
+        if self.rank[ra] < self.rank[rb]:
+            ra, rb = rb, ra
         self.parent[rb] = ra
+        if self.rank[ra] == self.rank[rb]:
+            self.rank[ra] += 1
         return True
 
 
-def mst_kruskal(g: Graph):
+def mst_kruskal(g: Graph) -> Tuple[List[Edge], float]:
+    """
+    Algorithme de Kruskal : construit un arbre couvrant minimal (MST).
+
+    Principe : trie toutes les arêtes par poids croissant et ajoute chaque arête
+    si elle ne crée pas de cycle (vérifié via DSU).
+    Complexité : O(E log E) dominée par le tri.
+
+    Args:
+        g: Le graphe non orienté pondéré.
+
+    Returns:
+        Tuple (liste des arêtes du MST, coût total).
+
+    Raises:
+        ValueError: Si le graphe est orienté.
+    """
+    if g.directed:
+        raise ValueError("Kruskal nécessite un graphe non orienté")
+
     edges = sorted(g.edges(), key=lambda e: e.w)
     dsu = DSU(g.nodes())
     mst = []
